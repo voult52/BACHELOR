@@ -1,0 +1,48 @@
+# Build output
+/build/
+/build_*/
+/esp-idf/build/
+/idf_component.yml
+sdkconfig
+sdkconfig.old
+
+# Flash binaries
+*.bin
+*.elf
+*.map
+
+# Ninja/CMake intermediate files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+Makefile
+
+# IDF Python virtualenv / tools
+.venv/
+.env/
+*.pyc
+
+# VS Code / IDE metadata
+.vscode/
+*.code-workspace
+
+# CLion
+.idea/
+
+# PlatformIO (if you ever use it)
+.pio/
+
+# Mac / Linux FS metadata
+.DS_Store
+Thumbs.db
+
+# Logging output
+*.log
+
+# Coverage
+coverage/
+
+# Misc
+*.swp
+*~

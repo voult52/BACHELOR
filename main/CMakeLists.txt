@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "src/main.c"
+        "src/AHT21_ENS160.c"
+        "src/soil_moisture.c"
+    INCLUDE_DIRS
+        "inc"
+        "src"
+        "."
+    PRIV_INCLUDE_DIRS
+        "${IDF_PATH}/components/bt/host/nimble/nimble/nimble/host/store/config/include"
+    REQUIRES
+        bt
+        nvs_flash
+        driver
+        esp_timer
+        esp_adc
+)
