@@ -9,7 +9,7 @@
 #include "esp_timer.h"
 #include "driver/i2c_master.h"
 #include "driver/gpio.h"
-
+#include "esp_sleep.h"
 // NimBLE includes
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
@@ -22,7 +22,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "host/ble_hs_adv.h"
 #include "store/config/ble_store_config.h"
-
+#include "esp_attr.h"
 // Sensor includes
 #include "AHT21_ENS160.h"
 #include "soil_moisture.h"
@@ -183,35 +183,64 @@ const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     {0}
 };
 
-// Notification task
+
+
+
+RTC_DATA_ATTR static int boot_count = 0;
+
 static void sensor_update_task(void *param)
 {
-    while (1) {
-        vTaskDelay(pdMS_TO_TICKS(SENSOR_UPDATE_INTERVAL_MS));
+    const uint64_t deep_sleep_duration_us = 600 * 1000000ULL; // 10 minutes
+    boot_count++;
+    ESP_LOGI(TAG, "Boot count: %d", boot_count);
 
-        // only send when connected AND notify has been enabled by client
-        if (conn_handle == BLE_HS_CONN_HANDLE_NONE || !notify_enabled) {
-            continue;
+    sensor_payload_t data;
+    read_all_sensors(&data);
+
+    uint32_t elapsed = 0;
+    const uint32_t max_wait_time_ms = (boot_count == 1) ? 120000 : 30000; // First boot: wait max 2 mins, subsequent boots: 30s
+    bool data_sent = false;
+
+    ESP_LOGI(TAG, "Waiting for client to connect and subscribe/read (max %lu ms)...", (unsigned long)max_wait_time_ms);
+
+
+    while (elapsed < max_wait_time_ms) {
+        if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+            struct os_mbuf *om = ble_hs_mbuf_from_flat(&data, sizeof(data));
+            if (om) {
+                int rc = ble_gatts_notify_custom(conn_handle, sensor_data_val_handle, om);
+                if (rc == 0) {
+                    ESP_LOGI(TAG, "Notification sent successfully.");
+                    data_sent = true;
+                } else {
+                    ESP_LOGW(TAG, "Notification failed: %d", rc);
+                    os_mbuf_free_chain(om);
+                }
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(2000)); // wait a bit for client to process
+            break;
         }
 
-        sensor_payload_t data;
-        read_all_sensors(&data);
-
-        struct os_mbuf *om = ble_hs_mbuf_from_flat(&data, sizeof(data));
-        if (!om) {
-            ESP_LOGW(TAG, "Failed to allocate mbuf for notification");
-            continue;
-        }
-
-        int rc = ble_gatts_notify_custom(conn_handle,
-                                         sensor_data_val_handle,
-                                         om);
-        if (rc != 0) {
-            ESP_LOGW(TAG, "Notification failed: %d", rc);
-            os_mbuf_free_chain(om);
-        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        elapsed += 1000;
     }
+
+    if (!data_sent) {
+        ESP_LOGW(TAG, "No client subscribed or read data; going to sleep anyway.");
+    }
+
+    ESP_LOGI(TAG, "Entering deep sleep for 10 minutes...");
+    esp_sleep_enable_timer_wakeup(deep_sleep_duration_us);
+    esp_deep_sleep_start();
+
+    vTaskDelete(NULL); // Should never reach here
 }
+
+
+
+
+
 
 // GAP event handler
 static int ble_gap_event_cb(struct ble_gap_event *event, void *arg) {

@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "project-name",
-    "project_version":    "1",
+    "project_version":    "5829c2c-dirty",
     "project_path":       "C:/Users/Blue_wolf_/project-name",
     "idf_path":           "C:/Users/Blue_wolf_/esp/v5.4.1/esp-idf",
     "build_dir":          "C:/Users/Blue_wolf_/project-name/build",
