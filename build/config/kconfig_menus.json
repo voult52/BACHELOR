@@ -10254,10 +10254,7 @@
                                                         "help": "Set this option to set the upper limit for number of periodic sync\nconnections. This should be less than maximum connections allowed by\ncontroller.",
                                                         "id": "BT_NIMBLE_MAX_PERIODIC_SYNCS",
                                                         "name": "BT_NIMBLE_MAX_PERIODIC_SYNCS",
-                                                        "range": [
-                                                            0,
-                                                            8
-                                                        ],
+                                                        "range": null,
                                                         "title": "Maximum number of periodic advertising syncs",
                                                         "type": "int"
                                                     },

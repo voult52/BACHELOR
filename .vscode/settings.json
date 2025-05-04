@@ -40,7 +40,8 @@
         "nvs_flash.h": "c",
         "esp_system.h": "c",
         "gpio.h": "c",
-        "ble_store.h": "c"
+        "ble_store.h": "c",
+        "adc_oneshot.h": "c"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

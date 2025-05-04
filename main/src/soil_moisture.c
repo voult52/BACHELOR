@@ -1,47 +1,75 @@
 #include "soil_moisture.h"
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_log.h"
-#include <inttypes.h>
 
 static const char *TAG = "soil_moisture";
 
-#define ADC_CHANNEL      ADC1_CHANNEL_0
-#define ADC_ATTEN        ADC_ATTEN_DB_12
-#define ADC_WIDTH        ADC_WIDTH_BIT_12
-#define DEFAULT_VREF     1100
 
-static esp_adc_cal_characteristics_t adc_chars;
 
-void configure_soil_moisture_adc(void)
+// Superkondensatora mērījuma definīcijas
+#define SUPERCAP_ADC_CHANNEL     ADC_CHANNEL_3      // GPIO3 = ADC1_CH3
+#define SUPERCAP_ADC_UNIT        ADC_UNIT_1
+#define SUPERCAP_ADC_ATTEN       ADC_ATTEN_DB_12    // Līdz ~3.3V
+#define SUPERCAP_BIT_WIDTH       ADC_BITWIDTH_12
+static adc_oneshot_unit_handle_t adc_handle;  // tikai viens
+
+void configure_soil_moisture_adc(void) 
 {
-    adc1_config_width(ADC_WIDTH);
-    adc1_config_channel_atten(ADC_CHANNEL, ADC_ATTEN);
+    adc_oneshot_unit_init_cfg_t unit_cfg = {
+        .unit_id = ADC_UNIT_1,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&unit_cfg, &adc_handle));
 
-    esp_adc_cal_value_t val_type =
-        esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN, ADC_WIDTH, DEFAULT_VREF, &adc_chars);
-    uint32_t vref = adc_chars.vref;
+    // Augsnes mitruma ADC kanāla konfigurācija
+    adc_oneshot_chan_cfg_t chan_cfg_soil = {
+        .atten = SOIL_MOISTURE_ADC_ATTEN,
+        .bitwidth = SOIL_MOISTURE_BIT_WIDTH,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, SOIL_MOISTURE_ADC_CHANNEL, &chan_cfg_soil));
 
-    if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        ESP_LOGI(TAG, "ADC characterized using eFuse Vref: %" PRIu32 " mV", vref);
-    } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
-        ESP_LOGI(TAG, "ADC characterized using Two Point Vref: %" PRIu32 " mV", vref);
-    } else {
-        ESP_LOGI(TAG, "ADC characterized using default Vref: %" PRIu32 " mV", vref);
-    }
+    // Superkondensatora ADC kanāla konfigurācija
+    adc_oneshot_chan_cfg_t chan_cfg_batt = {
+        .atten = SUPERCAP_ADC_ATTEN,
+        .bitwidth = SUPERCAP_BIT_WIDTH,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc_handle, SUPERCAP_ADC_CHANNEL, &chan_cfg_batt));
+
+    ESP_LOGI(TAG, "Configured ADC1 for soil moisture (ch %d) and supercap (ch %d)", 
+             SOIL_MOISTURE_ADC_CHANNEL, SUPERCAP_ADC_CHANNEL);
 }
+
 
 int read_soil_moisture_raw(void)
 {
-    return adc1_get_raw(ADC_CHANNEL);
+    int raw = 0;
+    if (adc_oneshot_read(adc_handle, SOIL_MOISTURE_ADC_CHANNEL, &raw) == ESP_OK) {
+        return raw;
+    }
+    ESP_LOGW(TAG, "Failed to read soil moisture ADC");
+    return -1;
 }
 
 uint8_t get_soil_moisture_percent(int raw_adc)
 {
-    const int DRY = 3000;
-    const int WET = 1500;
-    int percent = 100 - ((raw_adc - WET) * 100) / (DRY - WET);
-    if (percent < 0) percent = 0;
-    if (percent > 100) percent = 100;
+    if (raw_adc < 0) return 0;
+
+    int percent = 100 - ((raw_adc - SOIL_MOISTURE_WET_ADC) * 100) / 
+                         (SOIL_MOISTURE_DRY_ADC - SOIL_MOISTURE_WET_ADC);
+    if (percent < 0) return 0;
+    if (percent > 100) return 100;
     return (uint8_t)percent;
+}
+
+// Jaunā funkcija — superkondensatora sprieguma mērīšana
+int read_supercap_voltage_mv(void)
+{
+    int raw = 0;
+    if (adc_oneshot_read(adc_handle, SUPERCAP_ADC_CHANNEL, &raw) != ESP_OK) {  // <-- izmanto adc_handle
+        ESP_LOGW(TAG, "Failed to read supercap ADC");
+        return -1;
+    }
+
+    int mv = (raw * 3300) / 4095;
+    ESP_LOGI(TAG, "Supercap voltage: %d mV (raw=%d)", mv, raw);
+    return mv;
 }
