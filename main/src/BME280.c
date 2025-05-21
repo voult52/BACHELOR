@@ -17,13 +17,9 @@
 #define BME280_REG_DATA         0xF7
 #define BME280_DATA_LEN         8
 
-#define ENS160_ADDR             0x53
-#define ENS160_REG_PART_ID      0x00
-#define ENS160_REG_OPMODE       0x10
-#define ENS160_REG_DATA_AQI     0x21
 
 static const char *TAG_BME280 = "BME280";
-static const char *TAG_ENS160 = "ENS160";
+
 
 // --- Static Device Handles ---
 static i2c_master_dev_handle_t bme280_dev_handle = NULL;

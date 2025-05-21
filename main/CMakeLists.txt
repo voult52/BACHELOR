@@ -1,8 +1,9 @@
 idf_component_register(
     SRCS
         "src/main.c"
-        "src/AHT21_ENS160.c"
+        "src/ENS160.c"
         "src/soil_moisture.c"
+        "src/BME280.c"
     INCLUDE_DIRS
         "inc"
         "src"

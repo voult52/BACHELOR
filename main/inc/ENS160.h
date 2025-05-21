@@ -1,6 +1,6 @@
 // AHT21_ENS160.h
-#ifndef AHT21_ENS160_H
-#define AHT21_ENS160_H
+#ifndef ENS160_H
+#define ENS160_H
 
 #include "driver/i2c_master.h" // Include for i2c_master_bus_handle_t
 #include "esp_err.h"
@@ -26,15 +26,12 @@
 
 // Function Prototypes
 // Modified to accept the bus handle
-esp_err_t aht21_init(i2c_master_bus_handle_t bus_handle);
-esp_err_t read_aht21(float *temperature, float *humidity);
+
 
 // Modified to accept the bus handle
 esp_err_t ens160_init(i2c_master_bus_handle_t bus_handle);
 esp_err_t read_ens160(uint8_t *aqi, uint16_t *tvoc, uint16_t *eco2);
-// --- AHT21 Sleep/Wake ---
-esp_err_t aht21_sleep(void);
-esp_err_t aht21_wake(void);
+
 
 // --- ENS160 Sleep/Wake ---
 esp_err_t ens160_sleep(void);

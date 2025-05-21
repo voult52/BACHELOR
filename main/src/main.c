@@ -20,7 +20,7 @@
 #include "host/ble_hs_adv.h"
 #include "store/config/ble_store_config.h"
 
-#include "AHT21_ENS160.h"
+#include "ENS160.h"
 #include "soil_moisture.h"
 
 #define TAG "BLE_SENSOR"
@@ -58,7 +58,6 @@ static void read_all_sensors(sensor_payload_t *p) {
     uint16_t tvoc = 0, eco2 = 0;
     int raw_adc = 0;
 
-    read_aht21(&temp, &hum);
     read_ens160(&aqi, &tvoc, &eco2);
 
     p->temperature = (int16_t)(temp * 10);
@@ -151,7 +150,6 @@ void app_main(void) {
     };
     i2c_new_master_bus(&cfg, &bus);
     configure_soil_moisture_adc();
-    aht21_init(bus);
     ens160_init(bus);
 
     read_all_sensors(&sensor_data);
