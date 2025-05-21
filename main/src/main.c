@@ -1,4 +1,4 @@
-// ble_sensor_node.c - Deep Sleep BLE Sensor Node with Optimized BLE for Supercap
+
 
 #include <stdio.h>
 #include <string.h>
@@ -90,9 +90,9 @@ static void go_to_sleep() {
 static void check_and_sleep(void *arg) {
     ble_gap_adv_stop();
     if (data_sent) {
-        ESP_LOGI(TAG, "✅ Data sent successfully");
+        ESP_LOGI(TAG, "DATA SENDED");
     } else {
-        ESP_LOGI(TAG, "⚠️ No data received");
+        ESP_LOGI(TAG, "ERROR SENDING DATA");
     }
     
     go_to_sleep();
@@ -113,7 +113,7 @@ static void start_advertising(uint32_t adv_time_s) {
     };
     ble_gap_adv_set_fields(&fields);
     ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &advp, NULL, NULL);
-    ESP_LOGI(TAG, "📡 Advertising started for %lu sec", (unsigned long)adv_time_s);
+    ESP_LOGI(TAG, "Advertising started for %lu sec's", (unsigned long)adv_time_s);
     static esp_timer_handle_t adv_timer;
     esp_timer_create_args_t tcfg = {
         .callback = check_and_sleep,
@@ -135,7 +135,6 @@ static void host_task(void *param) {
 }
 
 void app_main(void) {
-    ESP_LOGI(TAG, "🚀 Booting...");
     start_us = esp_timer_get_time();
     data_sent = false;
 

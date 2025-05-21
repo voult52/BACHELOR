@@ -1,11 +1,9 @@
 # Build output
-/build/
-/build_*/
-/esp-idf/build/
-/idf_component.yml
-sdkconfig
-sdkconfig.old
 
+/idf_component.yml
+pytest_blink.py
+sdkconfig.old
+/build/
 # Flash binaries
 *.bin
 *.elf
@@ -46,3 +44,4 @@ coverage/
 # Misc
 *.swp
 *~
+
