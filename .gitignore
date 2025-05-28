@@ -4,8 +4,7 @@
 pytest_blink.py
 sdkconfig.old
 /build/
-/.devcontainer/
-/.vscode/
+
 # Flash binaries
 *.bin
 *.elf
