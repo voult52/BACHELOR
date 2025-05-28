@@ -16,7 +16,7 @@
 #define AHT21_DATA_LEN                  7 // Status + 6 data bytes
 
 // --- ENS160 Definitions ---
-#define ENS160_ADDR                     0x53 // Or 0x52 depending on ADDR pin
+#define ENS160_ADDR                     0x52 // Or 0x52 depending on ADDR pin
 #define ENS160_REG_PART_ID              0x00
 #define ENS160_REG_OPMODE               0x10
 #define ENS160_REG_DATA_AQI             0x21

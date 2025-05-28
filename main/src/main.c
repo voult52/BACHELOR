@@ -1,5 +1,4 @@
-
-
+// Iekļauj nepieciešamās bibliotēkas un draiverus
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -11,7 +10,7 @@
 #include "driver/i2c_master.h"
 #include "esp_adc/adc_oneshot.h"
 
-// NimBLE
+// BLE NimBLE bibliotēkas
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
@@ -19,26 +18,33 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "host/ble_hs_adv.h"
 #include "store/config/ble_store_config.h"
+
+// Sensora draiveri
 #include "BME280.h"
 #include "ENS160.h"
 #include "soil_moisture.h"
 
+// --- Konfigurācijas ---
 #define TAG "BLE_SENSOR"
 #define DEVICE_NAME "ESP32_SensorNode"
-#define SLEEP_INTERVAL_US (10 * 60 * 1000000ULL)
+#define SLEEP_INTERVAL_US (10 * 60 * 1000000ULL) // 10 minūšu miega režīms
 
-void ble_store_config_init(void);
+void ble_store_config_init(void); // BLE atmiņas inicializācija
 
+// --- BLE UUID definīcijas (serviss un raksturlielums) ---
 static const ble_uuid128_t sensor_service_uuid = BLE_UUID128_INIT(0x00,0x20,0xB5,0xA3,0xF3,0x93,0xE0,0xA9,0xE5,0x0E,0xDC,0x24,0x01,0x00,0xCA,0x9E);
 static const ble_uuid128_t sensor_data_char_uuid = BLE_UUID128_INIT(0x00,0x20,0xB5,0xA3,0xF3,0x93,0xE0,0xA9,0xE5,0x0E,0xDC,0x24,0x02,0x00,0xCA,0x9E);
 
+// --- BLE mainīgie ---
 static uint8_t ble_addr_type;
 static uint16_t sensor_data_val_handle;
 static int64_t start_us = 0;
 static bool data_sent = false;
 
+// --- Cold boot flags (saglabājas miega režīmā) ---
 RTC_DATA_ATTR static bool cold_boot = true;
 
+// --- Sensoru dati (ievietoti kā BLE payload) ---
 typedef struct __attribute__((packed)) {
     int16_t temperature;
     int16_t humidity;
@@ -52,25 +58,26 @@ typedef struct __attribute__((packed)) {
 
 static sensor_payload_t sensor_data;
 
+// --- Funkcija: nolasīt visus sensorus un aizpildīt struktūru ---
 static void read_all_sensors(sensor_payload_t *p) {
     float temp = 0, hum = 0;
     uint8_t aqi = 0; 
     uint16_t tvoc = 0, eco2 = 0;
 
-    bme280_read(&temp, &hum);      // <-- updated: no pressure arg
-    read_ens160(&aqi, &tvoc, &eco2);
+    bme280_read(&temp, &hum); // Lasām BME280
+    read_ens160(&aqi, &tvoc, &eco2); // Lasām ENS160
 
-    p->temperature = (int16_t)(temp * 10);  
+    p->temperature = (int16_t)(temp * 10);  // konvertē uz 0.1°C formātu
     p->humidity = (int16_t)(hum * 10);    
     p->aqi = aqi;
     p->tvoc = tvoc;
     p->eco2 = eco2;
     p->soil_moisture = get_soil_moisture_percent(read_soil_moisture_raw());
-    p->battery = read_supercap_voltage_mv();
-    p->light = 0xFF;  // Placeholder
+    p->battery = read_supercap_voltage_mv(); // Nolasām spriegumu
+    p->light = 0xFF;  // Rezervēts/placeholder
 }
 
-
+// --- BLE GATT pieprasījuma apstrāde (READ) ---
 static int gatt_read_cb(uint16_t conn, uint16_t handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     if (handle == sensor_data_val_handle) {
         os_mbuf_append(ctxt->om, &sensor_data, sizeof(sensor_data));
@@ -80,13 +87,15 @@ static int gatt_read_cb(uint16_t conn, uint16_t handle, struct ble_gatt_access_c
     return BLE_ATT_ERR_UNLIKELY;
 }
 
+// --- Funkcija: iedarbina miega režīmu ---
 static void go_to_sleep() {
     int64_t end_us = esp_timer_get_time();
     ESP_LOGI(TAG, "Total active time: %lld ms", (end_us - start_us) / 1000);
-    esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_US);
-    esp_deep_sleep_start();
+    esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_US); // konfigurē modināšanu pēc laika
+    esp_deep_sleep_start(); // ieiet deep sleep
 }
 
+// --- Funkcija: BLE reklāmas beigas / laika pārbaude ---
 static void check_and_sleep(void *arg) {
     ble_gap_adv_stop();
     if (data_sent) {
@@ -94,10 +103,10 @@ static void check_and_sleep(void *arg) {
     } else {
         ESP_LOGI(TAG, "ERROR SENDING DATA");
     }
-    
     go_to_sleep();
 }
 
+// --- BLE reklāmas uzsākšana ---
 static void start_advertising(uint32_t adv_time_s) {
     struct ble_gap_adv_params advp = {
         .conn_mode = BLE_GAP_CONN_MODE_UND,
@@ -111,35 +120,43 @@ static void start_advertising(uint32_t adv_time_s) {
         .num_uuids128 = 1,
         .uuids128_is_complete = 1
     };
+
     ble_gap_adv_set_fields(&fields);
     ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &advp, NULL, NULL);
+
     ESP_LOGI(TAG, "Advertising started for %lu sec's", (unsigned long)adv_time_s);
+
+    // Laika ierobežojums BLE reklāmai
     static esp_timer_handle_t adv_timer;
     esp_timer_create_args_t tcfg = {
         .callback = check_and_sleep,
         .name = "adv_timeout"
     };
     esp_timer_create(&tcfg, &adv_timer);
-    esp_timer_start_once(adv_timer, adv_time_s * 1000000ULL);
+    esp_timer_start_once(adv_timer, adv_time_s * 1000000ULL); // pārveido sekundes uz mikrosekundēm
 }
 
+// --- BLE sinhronizācijas notikums (BLE ir gatavs) ---
 static void ble_app_on_sync(void) {
-    ble_hs_id_infer_auto(0, &ble_addr_type);
-    start_advertising(cold_boot ? 20 : 6);
+    ble_hs_id_infer_auto(0, &ble_addr_type); // automātiski piešķir BLE adreses tipu
+    start_advertising(cold_boot ? 12 : 6);   // pirmoreiz reklamē ilgāk
     cold_boot = false;
 }
 
+// --- BLE host uzdevums (NimBLE loop) ---
 static void host_task(void *param) {
     nimble_port_run();
     nimble_port_freertos_deinit();
 }
 
+// --- Galvenā programma ---
 void app_main(void) {
-    start_us = esp_timer_get_time();
+    start_us = esp_timer_get_time(); // laika skaitītājs
     data_sent = false;
 
-    nvs_flash_init();
+    nvs_flash_init(); // Inicializē NVS (nepārtrauktā atmiņa)
 
+    // I2C konfigurācija un inicializēšana
     i2c_master_bus_handle_t bus;
     i2c_master_bus_config_t cfg = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
@@ -150,16 +167,20 @@ void app_main(void) {
         .flags.enable_internal_pullup = true
     };
     i2c_new_master_bus(&cfg, &bus);
+
+    // Inicializē sensorus
     configure_soil_moisture_adc();
     ens160_init(bus);
     bme280_init(bus); 
-    read_all_sensors(&sensor_data);
-    
+    read_all_sensors(&sensor_data); // Nolasīt visus sensorus
+
+    // BLE inicializācija
     nimble_port_init();
     ble_store_config_init();
     ble_svc_gap_init();
     ble_svc_gatt_init();
 
+    // BLE GATT servisa un raksturlieluma konfigurācija
     static struct ble_gatt_chr_def chr[] = {{
         .uuid = (ble_uuid_t*)&sensor_data_char_uuid,
         .access_cb = gatt_read_cb,
@@ -178,5 +199,6 @@ void app_main(void) {
     ble_svc_gap_device_name_set(DEVICE_NAME);
     ble_hs_cfg.sync_cb = ble_app_on_sync;
 
+    // Startē NimBLE BLE host kā FreeRTOS uzdevumu
     nimble_port_freertos_init(host_task);
 }

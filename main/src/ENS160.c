@@ -40,9 +40,16 @@ esp_err_t ens160_init(i2c_master_bus_handle_t bus_handle) {
     // Read Part ID
     // Use the device handle and i2c_master_transmit_receive
     uint8_t reg_addr_pid = ENS160_REG_PART_ID;
-    ret = i2c_master_transmit_receive(ens160_dev_handle, &reg_addr_pid, 1, part_id, 2, -1);
+    ret = i2c_master_transmit(ens160_dev_handle, &reg_addr_pid, 1, -1);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG_ENS160, "Failed to read ENS160 part ID: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG_ENS160, "Failed to send ENS160 register address: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    vTaskDelay(pdMS_TO_TICKS(2));  // neliela aizture
+
+    ret = i2c_master_receive(ens160_dev_handle, part_id, 2, -1);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG_ENS160, "Failed to receive ENS160 part ID: %s", esp_err_to_name(ret));
         return ret;
     }
     uint16_t pid = (part_id[1] << 8) | part_id[0]; // Corrected order (LSB first)
