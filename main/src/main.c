@@ -19,7 +19,7 @@
 #include "services/gatt/ble_svc_gatt.h"
 #include "host/ble_hs_adv.h"
 #include "store/config/ble_store_config.h"
-
+#include "BME280.h"
 #include "ENS160.h"
 #include "soil_moisture.h"
 
@@ -56,19 +56,20 @@ static void read_all_sensors(sensor_payload_t *p) {
     float temp = 0, hum = 0;
     uint8_t aqi = 0; 
     uint16_t tvoc = 0, eco2 = 0;
-    int raw_adc = 0;
 
+    bme280_read(&temp, &hum);      // <-- updated: no pressure arg
     read_ens160(&aqi, &tvoc, &eco2);
 
-    p->temperature = (int16_t)(temp * 10);
-    p->humidity = (int16_t)(hum * 10);
+    p->temperature = (int16_t)(temp * 10);  
+    p->humidity = (int16_t)(hum * 10);    
     p->aqi = aqi;
     p->tvoc = tvoc;
     p->eco2 = eco2;
     p->soil_moisture = get_soil_moisture_percent(read_soil_moisture_raw());
     p->battery = read_supercap_voltage_mv();
-    p->light = 0xFF;
+    p->light = 0xFF;  // Placeholder
 }
+
 
 static int gatt_read_cb(uint16_t conn, uint16_t handle, struct ble_gatt_access_ctxt *ctxt, void *arg) {
     if (handle == sensor_data_val_handle) {
@@ -151,9 +152,9 @@ void app_main(void) {
     i2c_new_master_bus(&cfg, &bus);
     configure_soil_moisture_adc();
     ens160_init(bus);
-
+    bme280_init(bus); 
     read_all_sensors(&sensor_data);
-
+    
     nimble_port_init();
     ble_store_config_init();
     ble_svc_gap_init();

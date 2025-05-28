@@ -41,7 +41,9 @@
         "esp_system.h": "c",
         "gpio.h": "c",
         "ble_store.h": "c",
-        "adc_oneshot.h": "c"
+        "adc_oneshot.h": "c",
+        "bme280.h": "c",
+        "esp_timer.h": "c"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }
